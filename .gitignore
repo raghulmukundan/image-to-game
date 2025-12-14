@@ -1,0 +1,22 @@
+# Virtual Environment
+venv/
+env/
+
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+
+# Gradio
+flagged/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
