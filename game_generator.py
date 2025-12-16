@@ -105,39 +105,57 @@ class ImageToGameGenerator:
                 'game_html': f'<p style="text-align: center; padding: 40px;">Building {spec.get("title", "game")}...</p>'
             }
             
-            # Step 3: Generate HTML
+            # Step 3: Generate HTML with repair loop
             html = self.generate_html_component(spec)
-            html_issues = self.verify_html_component(html, spec['contracts'])
             
+            for attempt in range(self.max_repair_attempts):
+                html_issues = self.verify_html_component(html, spec['contracts'])
+                if not html_issues:
+                    break
+                if attempt < self.max_repair_attempts - 1:
+                    html = self.repair_html_component(html, html_issues, spec)
+    
             # Yield after HTML
             html_status = "Passed" if not html_issues else f"{len(html_issues)} issues"
             yield {
                 'analysis': analysis,
-                'reflection': f'{spec_preview}\n\nHTML Component: {html_status}\n{"Issues: " + ", ".join(html_issues) if html_issues else ""}\n\nNext: CSS and JS components...',
+                'reflection': f'HTML: {"✓" if not html_issues else f"⚠ {len(html_issues)}"}\n CSS...',
                 'game_html': f'<p style="text-align: center; padding: 40px; color: #00ff88;">HTML ready! ({len(html) if html else 0} chars)</p>'
             }
             
-                    # Step 3b: CSS
+            # Step 3b: CSS with repair loop
             css = self.generate_css_component(spec, html)
-            css_issues = self.verify_css_component(css, spec['contracts'])
+           
+            for attempt in range(self.max_repair_attempts):
+                css_issues = self.verify_css_component(css, spec['contracts'])
+                if not css_issues:
+                    break
+                if attempt < self.max_repair_attempts - 1:
+                    css = self.repair_css_component(css, css_issues, spec)
             
             yield {
                 'analysis': analysis,
-                'reflection': f'HTML: {"✓" if not html_issues else "⚠"}\nCSS: {"Passed" if not css_issues else f"{len(css_issues)} issues"}\nGenerating JavaScript...',
+                'reflection': f'HTML: ✓\nCSS: {"✓" if not css_issues else f"⚠ {len(css_issues)}"}\nJS...',
                 'game_html': '<p style="text-align: center; padding: 40px;">Adding game logic...</p>'
             }
             
-                    # Get image for JS
+            # Get image for JS
             image_base64 = self.encode_image(image_path)
             
-            # Step 3c: JavaScript
+            # Step 3c: JavaScript with repair loop
             js = self.generate_js_component(spec, html, image_base64)
-            js_issues = self.verify_js_component(js, spec['contracts'])
             
+            for attempt in range(self.max_repair_attempts):
+                js_issues = self.verify_js_component(js, spec['contracts'])
+                if not js_issues:
+                    break
+                if attempt < self.max_repair_attempts - 1:
+                    js = self.repair_js_component(js, js_issues, spec, image_base64)
+
             yield {
                 'analysis': analysis,
-                'reflection': f'HTML: {"✓" if not html_issues else "⚠"}\nCSS: {"✓" if not css_issues else "⚠"}\nJS: {"Passed" if not js_issues else f"{len(js_issues)} issues"}\n\nAssembling game...',
-                'game_html': '<p style="text-align: center; padding: 40px;">🔨 Assembling components...</p>'
+                'reflection': f'All components verified!\n\nHTML: ✓\nCSS: ✓\nJS: {"✓" if not js_issues else f"⚠ {len(js_issues)}"}\n\nAssembling...',
+                'game_html': '<p style="text-align: center; padding: 40px;">Assembling...</p>'
             }
             
             yield {
@@ -575,7 +593,7 @@ class ImageToGameGenerator:
         10. Required functions: startGame(), gameLoop(), draw()
         11. Game should finish in 2 minute
         12. When an item is collected, the item collected name should briefly appear at the top of the canvas for 3 seconds.
-        13. The obstacles should be drawn as filled rectangles using their specified colors from the spec. but keep the rectangle as translucent as possible and name of the obstacle written in a smaller font inside the obstacle.
+        13. The obstacles should be drawn as filled rectangles with dark black border using their specified colors from the spec. but keep the rectangle as translucent as possible and name of the obstacle written in a smaller font inside the obstacle.
         14. CRITICAL - START GAME IMMEDIATELY:
             At the very end of the script, call startGame() immediately:
             
@@ -587,7 +605,19 @@ class ImageToGameGenerator:
             }}
         15. CRITICAL: Use EXACTLY the text 'PLACEHOLDER_IMAGE_DATA' for the image src.
             Do NOT generate any base64 data yourself.
-            
+        16. CRITICAL DRAWING ORDER in draw() function:
+                a) Clear canvas
+                b) Draw background image (if loaded)
+                c) Draw obstacles
+                d) Draw collectibles  
+                e) Draw goal
+                f) Draw player LAST (so it's always on top!)
+                
+            Make player VERY VISIBLE:
+            - Player color: bright pink/red (#FF1493 or #FF69B4)
+            - Player size: 25x25 pixels
+            - Draw player as filled rectangle or circle
+            - Add black border around player (lineWidth: 2)    
             Return ONLY JavaScript code (no <script> tags).
             Use the exact obstacle and collectible positions from the spec."""
 
@@ -693,6 +723,29 @@ class ImageToGameGenerator:
         
         title = spec.get('title', 'Photo Game')
         
+        # CSS fixes for proper layout
+        layout_fixes = """
+        /* Allow scrolling, no cutoff */
+        body {
+            padding: 20px;
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto;
+        }
+        """
+            
+        # Prevent arrow keys from scrolling
+        scroll_prevention = """
+        // Prevent arrow keys from scrolling page during gameplay
+        window.addEventListener('keydown', function(e) {
+            if(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+                e.preventDefault();
+            }
+        }, false);
+        """
+
         full_html = f'''<!DOCTYPE html>
         <html lang="en">
         <head>
@@ -701,11 +754,13 @@ class ImageToGameGenerator:
             <title>{title}</title>
             <style>
         {css}
+        {layout_fixes}
             </style>
         </head>
         <body>
         {html_code}
             <script>
+        {scroll_prevention}
         {js}
             </script>
         </body>
@@ -724,7 +779,7 @@ class ImageToGameGenerator:
         iframe = f"""
             <iframe
             srcdoc="{escaped}"
-            style="width: 100%; max-width: 920px; height: 760px; border: 0; border-radius: 12px;"
+            style="width: 100%; max-width: 920px; height: 1024px; border: 0; border-radius: 12px;"
             sandbox="allow-scripts allow-same-origin"
             ></iframe>
             """
@@ -837,3 +892,138 @@ class ImageToGameGenerator:
         except Exception as e:
             print(f"Repair failed: {e}")
             return spec  # Return original if repair fails
+        
+    def repair_html_component(self, html, issues, spec):
+        """Repair HTML component"""
+        
+        print(f"Repairing HTML ({len(issues)} issues)...")
+        
+        contracts = spec['contracts']
+        issues_text = "\n".join([f"- {issue}" for issue in issues])
+        
+        prompt = f"""Fix this HTML component.
+
+        ISSUES:
+        {issues_text}
+
+        ORIGINAL HTML:
+        {html}
+
+        REQUIRED IDs:
+        - {contracts['container_id']}
+        - {contracts['canvas_id']} (800x600)
+        - {contracts['score_id']}
+        - {contracts['timer_id']}
+
+        Fix the issues. Return ONLY the corrected HTML (no explanations)."""
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=1000,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            
+            fixed = response.content[0].text
+            if "```html" in fixed:
+                fixed = fixed.split("```html")[1].split("```")[0].strip()
+            elif "```" in fixed:
+                fixed = fixed.split("```")[1].split("```")[0].strip()
+            
+            print(f"HTML repaired")
+            return fixed
+            
+        except Exception as e:
+            print(f"Repair failed: {e}")
+            return html     
+    
+    def repair_css_component(self, css, issues, spec):
+        """Repair CSS component"""
+        
+        print(f"Repairing CSS ({len(issues)} issues)...")
+        
+        contracts = spec['contracts']
+        issues_text = "\n".join([f"- {issue}" for issue in issues])
+        
+        prompt = f"""Fix this CSS component.
+
+        ISSUES:
+        {issues_text}
+
+        ORIGINAL CSS:
+        {css}
+
+        REQUIRED SELECTORS:
+        - #{contracts['canvas_id']}
+        - #{contracts['container_id']}
+
+        Fix the issues. Return ONLY the corrected CSS (no explanations)."""
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=1000,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            
+            fixed = response.content[0].text
+            if "```css" in fixed:
+                fixed = fixed.split("```css")[1].split("```")[0].strip()
+            elif "```" in fixed:
+                fixed = fixed.split("```")[1].split("```")[0].strip()
+            
+            print(f"CSS repaired")
+            return fixed
+            
+        except Exception as e:
+            print(f"Repair failed: {e}")
+            return css
+    
+    def repair_js_component(self, js, issues, spec, image_base64):
+        """Repair JavaScript component"""
+        
+        print(f"Repairing JavaScript ({len(issues)} issues)...")
+        
+        contracts = spec['contracts']
+        issues_text = "\n".join([f"- {issue}" for issue in issues])
+        
+        prompt = f"""Fix this JavaScript component.
+
+        ISSUES:
+        {issues_text}
+
+        ORIGINAL JS:
+        {js[:3000]}...
+
+        REQUIRED:
+        - Functions: startGame(), gameLoop(), draw()
+        - Use IDs: {contracts['canvas_id']}, {contracts['score_id']}, {contracts['timer_id']}
+        - requestAnimationFrame in game loop
+
+        Fix the issues. Return ONLY the corrected JavaScript (no explanations)."""
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=3500,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            
+            fixed = response.content[0].text
+            if "```javascript" in fixed:
+                fixed = fixed.split("```javascript")[1].split("```")[0].strip()
+            elif "```js" in fixed:
+                fixed = fixed.split("```js")[1].split("```")[0].strip()
+            elif "```" in fixed:
+                fixed = fixed.split("```")[1].split("```")[0].strip()
+            
+            # Re-inject image
+            if 'PLACEHOLDER_IMAGE_DATA' in fixed:
+                fixed = fixed.replace('PLACEHOLDER_IMAGE_DATA', f'data:image/jpeg;base64,{image_base64}')
+            
+            print(f"JavaScript repaired")
+            return fixed
+            
+        except Exception as e:
+            print(f"Repair failed: {e}")
+            return js

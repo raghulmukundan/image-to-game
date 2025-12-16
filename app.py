@@ -107,9 +107,9 @@ with gr.Blocks(title="Image to Game Generator") as app:
         )
         
         reflection_output = gr.Textbox(
-            label="Step 2: Reflection (Coming Soon!)",
+            label="Step 2: Game Specification, Code Generation, Feedback and Repair",
             lines=5,
-            placeholder="AI's self-reflection will be added in next step..."
+            placeholder="Claude's code generation repair will appear here..."
         )
     
     # Footer
