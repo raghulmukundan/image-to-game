@@ -25,33 +25,17 @@ def generate_game(image):
         )
     
     try:
-        # Show processing message immediately
-        yield (
-            """<div style='padding: 40px; background: #1a1a1a; color: white; 
-            border-radius: 10px; text-align: center;'>
-                <h2 style='color: #00ff88;'>🔍 Analyzing Your Image...</h2>
-                <p>Claude Vision is examining the scene...</p>
-                <p style='color: #666; margin-top: 10px;'>This takes 30-45 seconds...</p>
-                <div style='margin: 20px; font-size: 24px;'>⏳</div>
-            </div>""",
-            "⏳ Analyzing image with Claude Vision...",
-            ""
-        )
-        
-        # Generate game - Claude writes the code!
-        result = generator.generate_game(image)
-        
-        # Return the actual game HTML that Claude generated
-        yield (
-            result['game_html'],
-            result['analysis'],
-            result['reflection']
-        )
+            for result in generator.generate_game(image):
+                yield (
+                    result['game_html'],
+                    result['analysis'],
+                    result['reflection']
+                )
         
     except Exception as e:
         error_html = f"""
         <div style='padding: 20px; background: #1a1a1a; color: #ff4444; border-radius: 10px;'>
-            <h3>❌ Error During Generation</h3>
+            <h3>Error During Generation</h3>
             <p>{str(e)}</p>
             <p style='font-size: 12px; margin-top: 10px; color: #666;'>
                 Check the terminal for detailed error messages
