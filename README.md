@@ -1,3 +1,14 @@
+---
+title: AI Image to Game generator
+emoji: 🎭
+colorFrom: blue
+colorTo: purple
+sdk: gradio
+sdk_version: 4.0.0
+app_file: app.py
+pinned: false
+---
+
 # 🎮 Image-to-Game Generator
 
 Turn any photo into a playable browser game using AI! Upload an image, and Claude Vision analyzes the scene to generate a complete HTML5 game with custom mechanics.
@@ -263,84 +274,6 @@ This **"defense in depth"** ensures every game works!
 - **HTML5 Canvas** - Game rendering
 - **Vanilla JavaScript** - Game logic
 
-## 📊 Technical Details
-
-### Token Management
-
-| Component | Size | Max Tokens | Reason |
-|-----------|------|------------|---------|
-| Image Analysis | 1.5K | 2K | Vision description |
-| Game Spec | 800 | 2K | JSON structure |
-| HTML | 800 | 1K | Minimal markup |
-| CSS | 600 | 1K | Style rules |
-| JavaScript | 2.5K | 3.5K | Game logic |
-
-**Total:** ~6.2K chars generated (well under limits, no truncation!)
-
-### Verification Checks
-
-**Spec Verification (Python):**
-```python
-✓ Collectibles not inside obstacles
-✓ Positions within canvas bounds (0-800, 0-600)
-✓ Minimum 20px spacing from edges
-```
-
-**HTML Verification (Python):**
-```python
-✓ Has id="gameCanvas" (800x600)
-✓ Has id="score"
-✓ Has id="timer"
-✓ Valid HTML structure
-```
-
-**CSS Verification (Python):**
-```python
-✓ Styles #gameCanvas
-✓ Styles #score, #timer
-✓ Valid syntax (braces balanced)
-✓ No references to missing IDs
-```
-
-**JavaScript Verification (Python):**
-```python
-✓ Defines startGame()
-✓ Defines gameLoop()
-✓ Defines draw()
-✓ Uses document.getElementById('gameCanvas')
-✓ Uses requestAnimationFrame
-```
-
-### Why Component-Based Beats Monolithic
-
-**Problem with Monolithic Generation:**
-```
-Generate 8000-char HTML file
-  ↓
-Claude hits 4000 token limit
-  ↓
-File truncated mid-function
-  ↓
-Game broken, regenerate entire file
-  ↓
-Still might truncate
-```
-
-**Solution with Components:**
-```
-Generate HTML (800 chars) ✅
-Generate CSS (600 chars) ✅
-Generate JS (2500 chars) ✅
-  ↓
-JS has issue?
-  ↓
-Repair ONLY JS (2500 chars)
-  ↓
-HTML & CSS untouched
-  ↓
-Fast, targeted fix
-```
-
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -417,5 +350,4 @@ Open `http://localhost:7860`
 - How to implement reflection with external feedback
 - Component-based AI code generation
 - Verification-driven development
-- Token budget management
 - Multi-step AI orchestration
